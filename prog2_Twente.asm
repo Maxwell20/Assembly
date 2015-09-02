@@ -1,8 +1,8 @@
 ;------------------------------------------------------------------------------
 ; Author:  Maxwell Twente
-; CS308 hw2
+; CS308 hw3
 ;------------------------------------------------------------------------------
-title prog2_Twente.asm                   ;DOS file name of program
+title prog3_Twente.asm                   ;DOS file name of program
 
 .586                                    ;enable all pentium instructions
 .model flat, stdcall                    ;memory model & calling convention
@@ -123,48 +123,38 @@ GetConsoleScreenBufferInfo proto,      ;Prototype for getting console info
 	outFilename     db 256 dup(0)
 	fdata           db BUF_SIZE dup(0)
 	numBytes		dd ?
+	numBytes2in		dd ?
 	options         db 256 dup(0)
+	lineTemp		db 256 dup(0)
 
     newlineStr      db NEWLINE, 0       ;string for printing newline
 	filePrompt      db "Enter filename: ",0
 	fileError       db "Error reading file!",NEWLINE,0
 	bytesReadStr    db " bytes read.",NEWLINE,0
 	bytesWriteStr   db " bytes written.",NEWLINE,0
-	LFst			    db " 1)LOAD FILE ",NEWLINE,0
-	LFstprompt			db "ENTER FILE NAME: ",0
-	SOst			    db " 2)SORT ",NEWLINE,0
-	SRst			    db " 3)SORT REVERSE ",NEWLINE,0
-	TUst			    db " 4)TO UPPER CASE ",NEWLINE,0
-	TLst			    db " 5)TO LOWER CASE ",NEWLINE,0
-	RLst			    db " 6)REVERSE EACH LINE ",NEWLINE,0
-	SRstr			    db " 7)SEARCH AND REPLACE ",NEWLINE,0
-	SRstrprompt			db "ENTER WORD TO REPLACE: ",0
-	SRstrprompt2		db "REPLACE WITH:  ",0
-	SFst			    db " 8)SAVE TO FILE ",NEWLINE,0
-	QQst			    db " 9)QUIT ",NEWLINE,0
+	LFst			db " 1)LOAD FILE ",NEWLINE,0
+	LFst2			db "ENTER FILE NAME:",0
+	SBSst			db " 2)SEARCH FOR BIT SEQUENCE",NEWLINE,0
+	SBSst2			db "ENTER BIT PATTERN 3-8 CHAR:",0
+	QQst			db " 3)QUIT ",NEWLINE,0
+	QQst2			db " GOODBYE...",NEWLINE,0
+	noMatchp			    db " :::NO MATCH FOUND::: ",NEWLINE,0
+	invalidinp			    db " :::INVALID INPUT MUST BE 3-8 CHARS IN BINARY::: ",NEWLINE,0
+	SFprompt		db " SEQUENCES WERE FOUND.",0
 
 	output1         db MAX_LINE dup(0)       ;buffer for output strings
-	input1			db MAX_LINE dup(0)		 ;buffer for input strings
+	input1			db MAX_LINE dup(0) ;buffer for input strings
 	input2			db MAX_LINE dup(0)		 ;buffer for input strings
-	mystring		db "Aye yo dude",NEWLINE,0
+	strlenvar		db ?
+	strlenvar2		db ?
+	matchnum		db ?
 	
 	
     coord           dd  0
 	scrnBufInfo     db 22 DUP(0)
 
 
-	;do i need?
-	prompt1 BYTE    "String to Search: ", 0
-prompt2 BYTE    "Word to Search For: ", 0
-prompt3 BYTE    "Word to replace with: ", 0
-target  BYTE    80 DUP (?)
-key     BYTE    80 DUP (?)
-strSub  BYTE    80 DUP (?)
-trgtLength  DWORD   ?
-keyLength   DWORD   ?
-lastPosn    DWORD   ?
-strSubLen   DWORD   ?
-resultLbl BYTE  "The new sentence is: ", 0
+
 	
 
 ;----------------------------------------------------------
@@ -183,73 +173,236 @@ main proc
 		xor ecx, ecx                    ; zero out ecx
 		xor edx, edx                    ; zero out edx
 
-		;call clearscreen
-		;call ClearScreen
-		;display menue
 
 		call menue
 
 
 
-		;;testing toUpper
-		;lea edi, inFilename
-		;call GetString
-
-		;Call ReadFileContents
-
-		;lea esi, fdata
-		;call PrintString
-			
-		;lea esi, fdata
-		;call toUpper
-		;call revStr
-		;call toLower
-		
-
-
-		;lea esi, newlineStr
-		;call PrintString
-		;lea esi, fdata
-		;call PrintString
-		;lea esi, newlineStr
-		;call PrintString
-
-
-		;get outfile name
-		;lea edi, outFilename
-		;call GetString
-		;call WriteFileContents
-
-	
-
-		;lea edi, inFilename
-		;call GetString
-
-		;;load data
-		;call readFileContents
-
-		;;display file data
-		;lea esi,fdata
-
-
-
-
-
-		;;;;;;for testing 
-		;lea esi, mystring
-		;call PrintString
-
-		;lea esi, mystring
-		;call toUpper
-		;call PrintString
-	 
 
 
 	Exit:
  		invoke ExitProcess, 0			;exit process with no error
 
 main endp
+;--------------------------------------------------------------------------------
+;procedure to take a file pointed to by esi and takes each byte of the file 
+;increments through it and counts the occurences of the user input
+;--------------------------------------------------------------------------------
+FBP proc
+		pushad                        ; save registers
+		pushfd                        ; save flags
+				
+				lea edi, input1
+				call strLen
 
+				
+				mov strlenvar, cl
+				;getting count for comparison
+				sub cl, 8 
+				xor cl, 11111111b ;flips bits back to positive
+				inc cl
+				mov strlenvar2, cl
+	
+
+				;converting input string to number for comparisons
+				;input 1 is a string
+				;input 2 is a in binary for comparison
+				mov bx, 2					; mov number base into bx for conversion
+				lea esi, input1				
+				lea edi, input2
+				;converting input 2 to binary for comparing
+				call Str2Num
+				;loading back fdata for comparison
+				lea esi,fdata 
+
+		FBP_loop1:
+				cmp byte ptr [esi], 0; exit when null term found
+				je FBPdone
+				mov al, [esi] ;moves 1 byte intp esi
+				shr al,cl	  
+				push ecx
+				;shifting bits off to compare the byte
+				mov cl, strlenvar2
+				shl al, cl
+				shr al, cl
+				pop ecx
+				;loading user input for comoparison
+				mov bl, input2
+				xor bl,al
+				dec cl
+				cmp bl,0 ;match found
+				je FBPmFound
+				cmp cl,0
+				jnge FBPnext
+				jmp FBP_loop1
+
+		FBPmFound:
+				inc dl
+				mov matchnum, dl ;saving match count
+				jmp FBP_loop1
+
+
+		FBPnext:
+				inc esi
+				mov cl, strlenvar2
+				jmp FBP_loop1
+		FBPdone:
+				
+
+
+
+
+
+
+	    popfd                         ; restore registers
+		popad                         ; restore flags
+		ret                           ; return to calling procedure (pops IP)
+FBP endp
+;--------------------------------------------------------------------------------
+;file to binary proc
+;--------------------------------------------------------------------------------
+f2b proc
+		pushad                        ; save registers
+		pushfd                        ; save flags
+
+		    xor ax, ax					; zx = zero
+			xor cx, cx					; cx = zero			
+		
+		; for each character in string, perform weighted positional notation
+		; ax = (ax * base) + next number
+		charLoop:
+			cmp byte ptr [esi], 0		; see if we have reached null terminator
+			jz done_charLoop					; if so, jump to done
+			
+			; not null terminator
+			mov cl, [esi]				; move character into cl		
+			;sub cl, '0'					; convert character into number
+			mul bx						; multiply by our number base
+			add ax, cx					; add the 
+		    mov [edi], ax			; move ax into destination storage location
+			 
+			inc esi						; increment our pointer in string to next character
+			inc edi
+			jmp charLoop				; next iteration of loop
+		
+		; once we get here, we have reached the end of string, and ax should
+		; contain the number
+		done_charLoop:
+
+
+
+
+
+
+
+
+		popfd                         ; restore registers
+		popad                         ; restore flags
+		ret                           ; return to calling procedure (pops IP)
+
+
+f2b endp
+
+
+;--------------------------------------------------------------------------------
+;SEARCH BIT SEQUENCE PROCEDURE (this one works for binary strings)
+;compares fdata(esi) to input1(edi) and puts the match count in ecx
+;--------------------------------------------------------------------------------
+SBS proc
+		pushad                        ; save registers
+		pushfd                        ; save flags
+
+	
+
+
+		lea esi, fdata
+		lea edi, input1
+		
+		xor ecx,ecx
+		;need to compare fdata and input1 byte by byte
+		jmp SBS_compareLoop
+
+
+       SBS_compareLoop:
+			
+		   cmp byte ptr[edi], 0			;check for null terminator in input1 sequence
+		   je SBS_found
+		   cmp byte ptr[esi], 0
+		   je SBS_end			;we have reached the end of the file, now exit
+		  
+		   cmpsb					;comparing esi to edi
+		   jne SBS_notsame		;jump to not same if no longer match
+		   
+		jmp SBS_compareLoop
+		SBS_found:				;when null terminator is found in input we found a sequence
+			inc ecx				;counter for sequences found
+			lea edi, input1
+			dec esi
+		jmp SBS_compareLoop		;jumps back to find another sequence
+		SBS_notsame:
+			lea edi, input1
+			inc esi				;pont to next digit in fdata
+		jmp SBS_compareLoop		;jumps back to find another sequence
+	
+	
+
+	
+		SBS_end:
+
+		lea esi, newlineStr
+		call PrintString
+			mov numBytes2in,ecx
+			;display number of bytes in input1
+			;display # bytes read
+
+			mov eax, numBytes2in	   ; move num bytes read into eax, so we can save to variable
+			mov numBytes, eax		   ; now save value from eax into permanent variable
+			lea esi, matchnum          ; point esi at num bytes read for converting to string
+			mov ebx, 10                ; set our number base to base 10
+			lea edi, output1           ; point edi at location to store string
+			call Num2Str               ; now convert number to a string
+			mov esi, edi               ; now point esi at that string to display
+			call PrintString           ; display the string
+			lea esi, SFprompt          ; point esi at " bytes read." string
+			call PrintString           ; display it
+
+
+
+
+
+
+
+
+		popfd                         ; restore registers
+		popad                         ; restore flags
+		ret                           ; return to calling procedure (pops IP)
+SBS endp
+
+
+;------------------------------------------------------------------------------
+;string length proc
+;takes edi
+;output ecx
+;------------------------------------------------------------------------------
+strLen proc
+
+		
+		xor cl,cl
+		top:
+
+		cmp byte ptr[edi], 0
+		je done
+		inc edi
+		inc cl
+		jmp top
+		done:
+		
+		ret
+
+
+strLen endp
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;-----------------------------------------------------------------------------
 ;menue proc
 ;----------------------------------------------------------------------------
@@ -270,26 +423,9 @@ menue proc
 		lea esi, LFst
 		call PrintString
 
-		lea esi, SOst
+		lea esi, SBSst
 		call PrintString
 
-		lea esi, SRst
-		call PrintString
-
-		lea esi, TUst
-		call PrintString
-
-		lea esi, TLst
-		call PrintString
-
-		lea esi, RLst
-		call PrintString
-
-		lea esi, SRstr
-		call PrintString
-
-		lea esi, SFst
-		call PrintString
 
 		lea esi, QQst
 		call PrintString
@@ -312,364 +448,142 @@ menue proc
 		cmp options, '3'
 		je op3
 
-		cmp options, '4'
-		je op4
-
-		cmp options, '5'
-		je op5
-
-		cmp options, '6'
-		je op6
-
-		cmp options, '7'
-		je op7
-
-		cmp options, '8'
-		je op8
-		
-		cmp options, '9'
-		je op9
-
-		; option 1 for loading a fle
-		;op1:
-		; option 1 for loading a fle
-		op1:;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-		;clears screen
+		;--------------------------------------------
+		;executes if not a valid input
 		call ClearScreen
+		lea esi,invalidinp
+		call PrintString
+		jmp menueLoop
+		;-------------------------------------------
 
 
-		lea esi, LFstprompt
+
+;-- Begins Option1------------------------------------------------------------------------------------
+
+op1:
+	call ClearScreen
+		lea esi, LFst2
 		call PrintString
 		lea edi, inFilename
 		call GetString
 		Call ReadFileContents
-		lea esi, fdata
-		call PrintString
-
 		lea esi, newlineStr
 		call PrintString
-		jmp menueLoop
-		;;;end op1;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-		op2:
-
-		op3:
+	jmp menueLoop
+;-- end op1------------------------------------------------------------------------------------------
 
 
-		;; begin op4;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		op4:			; option 4 for to upper case
-
-		;clears screen
+;-- beging op2-----------------------------------------------------------------------------
+    op2:
 		call ClearScreen
+				lea esi, SBSst2
+				call PrintString
+				lea edi, input1
+				call GetString
+			call strLen ;gets length of input to see if valid
 
+			;checking input for validity-----------------------
+				
+				
+				cmp ecx, 3
+				jl invalid_op2
+				cmp ecx,8
+				jnl invalid_op2
+
+				lea edi, input1
+					top_op2:
+					
+						cmp byte ptr[edi], 0
+						je done_op2
+						cmp byte ptr[edi],'1'
+						je inc_in
+						cmp byte ptr[edi],'0'
+						jne invalid_op2
+
+						inc_in:
+						inc edi
+						jmp top_op2
+					done_op2:
+			 ;end validity test-------------------------------
+			
+		lea esi, fdata;for test
+		call PrintString;for test
 
 		lea esi, newlineStr
 		call PrintString
-		lea esi, fdata
-		call toUpper
+
+
+				
+				;lea esi, fdata
+				;call f2b
+				;mov esi, edi
+				;mov bx,2
+				;call Num2Str
+				;call PrintString
+				;lea esi, newlineStr
+				;call PrintString
+
+				;call SBS
+
+				lea esi, fdata 
+				call FBP
+				
+			;display number of bytes in input1
+			;display # bytes read
+
+			mov eax, numBytes2in	   ; move num bytes read into eax, so we can save to variable
+			mov numBytes, eax		   ; now save value from eax into permanent variable
+			lea esi, matchnum       ; point esi at num bytes read for converting to string
+			mov ebx, 10                ; set our number base to base 10
+			lea edi, output1           ; point edi at location to store string
+			call Num2Str               ; now convert number to a string
+			mov esi, edi               ; now point esi at that string to display
+			call PrintString           ; display the string
+			lea esi, SFprompt          ; point esi at " bytes read." string
+			call PrintString           ; display it
+
+			mov al, matchnum
+			xor al, al
+			mov matchnum, al
+
+				jmp end_op2
+
+				jmp op2
+		invalid_op2:
+				lea esi,invalidinp
+				call PrintString
+	end_op2:
+jmp menueLoop
+;-----------------------------------------------------------------------------------------
 		
-		call PrintString
-		lea esi, newlineStr
-		call PrintString
-		jmp menueLoop
-		;; end op4;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-		;; begin op5;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		op5:				;option 5 for to lower case
+;-- begin op3 for EXIT PROGRAM-------------------------------------------------------------
 
-		;clears screen
-		call ClearScreen
-
-
-		lea esi, newlineStr
-		call PrintString
-		lea esi, fdata
-		call toLower
-		lea esi, fdata
-		call PrintString
-		lea esi, newlineStr
-		call PrintString
-		jmp menueLoop
-		;; end op5;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		;; begin op6;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		op6:
-		call ClearScreen
-
-		call revStr
-
-		lea esi, fdata
-		call PrintString
-
-		jmp menueLoop
-		;; end op6 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		;; begin op7;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		op7:;;search and replace
-		call ClearScreen
-
-
-		call searchR
-		lea esi, newlineStr
-		call PrintString
-		jmp menueLoop
-		;; end op7 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		;; begin op 8;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		op8:		;;option 8 for saving to a file..
-
-		;clears screen
-		call ClearScreen
-
-		;get outfile name
-		lea esi, LFstprompt
-		call PrintString
-		lea edi, outFilename
-		call GetString
-		call WriteFileContents
-		lea esi, newlineStr
-		call PrintString
-		jmp menueLoop
-		;; end op 8;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 		
 		
-		op9:							;option 9 for quiting the program		
-		invoke ExitProcess, 0			;exit process with no error
+op3:								;option 9 for quiting the program	
+	call ClearScreen	
+		lea esi, newlineStr
+		call PrintString
+		lea esi, QQst2
+		call PrintString
+		lea esi, newlineStr
+		call PrintString		
+	invoke ExitProcess, 0		;exit process with no error
 
+
+
+;------------------------------------------------------------------------------------------
 		
 		popfd                         ; restore registers
 		popad                         ; restore flags
 		ret                           ; return to calling procedure (pops IP)
 
 menue endp
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
-;-----------------------------------------------------------------------------
-;2}sort proc
-;-----------------------------------------------------------------------------
-
-		;pushad                        ; save registers
-		;pushfd                        ; save flags
-		
-
-
-
-	
-
-		;popfd                         ; restore registers
-		;popad                         ; restore flags
-		;ret                           ; return to calling procedure (pops IP)
-;-----------------------------------------------------------------------------
-;3}reverse sort proc
-;-----------------------------------------------------------------------------
-		;pushad                        ; save registers
-		;pushfd                        ; save flags
-		
-
-	
-
-		;popfd                         ; restore registers
-		;popad                         ; restore flags
-		;ret                           ; return to calling procedure (pops IP)
-;-----------------------------------------------------------------------------
-;7) search and replace proc
-;-----------------------------------------------------------------------------
-searchR proc
-		pushad                        ; save registers
-		pushfd                        ; save flags
-		
-		lea esi, fdata				  ;printing file back before manupulations
-		call PrintString
-
-		lea esi, newlineStr
-		call PrintString
-
-		lea esi, SRstrprompt		  ;word to get
-		call PrintString
-
-		lea edi, input1				  ;stores word to get
-		call GetString
-
-		lea esi, SRstrprompt2		  ;word to replace
-		call PrintString
-
-		lea ebx, input2				 ;stores word to replace
-		call GetString
-
-
-
-
-	
- 
-    lea eax, fdata             ;address of target
-    push eax                    ;parameter
-    call strlen                 ;strlen(target)
-    add esp, 4                  ;remove parameter
-    mov trgtLength, eax         ;save length of target
-   
-    lea eax, input1                ;address of key
-    push eax                    ;parameter
-    call strlen                 ;strlen(key)
-    add esp, 4                  ;remove parameter
-    mov keyLength, eax          ;save length of key
-   
-    lea eax, input2             ;address of key
-    push eax                    ;parameter
-    call strlen                 ;strlen(strSub)
-    add esp, 4                  ;remove parameter
-    mov strSubLen, eax          ;save length of key
-
-    mov eax, trgtLength
-    sub eax, keyLength
-    inc eax                     ;trgtLength - keyLength +1
-    mov lastPosn, eax
-    cld                         ;Left to Right comparison
-    mov eax, 1                  ;starting position
-
-    whilePosn:
-        cmp eax, lastPosn       ;position <= last_posn?
-        jnle endWhilePosn       ;exit if past last position
-
-        lea esi, fdata         ;address of target string
-        add esi, eax            ;add position
-        dec esi                 ;address of position to check
-        lea edi, input1            ;address of key
-        mov ecx, keyLength      ;number of position to check
-        repe cmpsb              ;check
-        jz found                ;exit of success
-        inc eax                 ;increment position
-        jmp whilePosn           ;repeat
-
-    endWhilePosn:
-  
-        jmp quit
-
-    found:
-        sub edi, keyLength
-        mov ecx, strSubLen
-        lea esi, input2
-        cld
-        rep movsb
-        inc eax
-        jmp whilePosn
-
-    quit:
-
-
-
-		lea esi, fdata				;printing file back aftermanupulations
-		call PrintString
-
-
-
-	
-
-		popfd                         ; restore registers
-		popad                         ; restore flags
-		ret                           ; return to calling procedure (pops IP)
-searchR endp
-;-----------------------------------------------------------------------------
-;6)proc for reversing a string
-;-----------------------------------------------------------------------------
-revStr proc
-		pushad                        ; save registers
-		pushfd                        ; save flags
-
-
-		mov ecx, numBytes
-		lea eax, fdata
-		mov esi, eax  ; esi points to start of string
-		add eax, ecx
-		mov edi, eax
-		dec edi       ; edi points to end of string
-		shr ecx, 1    ; ecx is count (length/2)
-		jz done       ; if string is 0 or 1 characters long, done
-	reverseLoop:
-		mov al, [esi] ; load characters
-		mov bl, [edi]
-		mov [esi], bl ; and swap
-		mov [edi], al
-		inc esi       ; adjust pointers
-		dec edi
-		dec ecx       ; and loop
-		jnz reverseLoop
-
-
-	done:
-
-;lea esi,fdata
-;call PrintString
-
-lea esi, newlineStr
-call PrintString
-		popfd                         ; restore registers
-		popad                         ; restore flags
-		ret                           ; return to calling procedure (pops IP)
-revStr endp
-
-;------------------------------------------------------------------------------
-;5)proc for changing to lower case-done
-;
-;------------------------------------------------------------------------------
-toLower proc
-		pushad                        ; save registers
-		pushfd                        ; save flags
-
-
-
-		
-			mov bl, 20h
-			lea esi, fdata
-			mov ecx,numBytes
-			jcxz Exit3
-		foreachChar:
-			mov al,[esi]
-			or al,bl;;subtracting 20h from each digit
-			mov[esi],al
-			inc esi
-			loop foreachChar 
-
-		
-			Exit3:
-
-
-		popfd                         ; restore registers
-		popad                         ; restore flags
-		ret                           ; return to calling procedure (pops IP)
-toLower endp
-;------------------------------------------------------------------------------
-;4)proc for changing toUPPER--done
-;
-;------------------------------------------------------------------------------
-	
-			
-toUpper proc	
-		pushad                        ; save registers
-		pushfd                        ; save flags
-
-	
-			mov bl, 20h
-			not bl
-			lea esi, fdata
-			mov ecx,numBytes
-			jcxz Exit2
-		foreachChar:
-			mov al,[esi]
-			and al,bl;;adding 20h to each digit
-			mov[esi],al
-			inc esi
-			loop foreachChar 
-
-		
-			
-			Exit2:
-
-			
-
-			popfd                         ; restore registers
-		    popad                         ; restore flags
-		    ret                           ; return to calling procedure (pops IP)
-
-toUpper endp
 ;------------------------------------------------------------------------------
 ; Procedure to clear the console in win32
 ;------------------------------------------------------------------------------
@@ -699,46 +613,6 @@ ClearScreen proc
 ClearScreen endp
 
 
-
-
-
-
-;------------------------------------------------------------------------------
-; 8)Procedure to write data to file
-; [IN] file contents in fdata
-; [IN] outFilename
-;------------------------------------------------------------------------------
-WriteFileContents  proc                ; Define procedure
-            pushad                     ; save all registers
-            pushfd                     ; save flags
-
-            invoke CreateFileA, near32 ptr outFilename, GENERIC_WRITE, FILE_SHARE_WRITE,
-			   0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0
-			mov hFileOut, eax
-
-            invoke WriteFile,          ; invoke standard WriteFile with
-              hFileOut,                ;   file handle for screen
-              near32 ptr fdata,         ;changed from esi to fdata ;   address of string
-              numBytes,                ;   length of string
-              near32 ptr written,      ;   variable for # bytes written
-              0                        ;   overlapped mode			
-
-			invoke CloseHandle, hFileOut; close file handle
-
-			; display number of bytes written
-			lea esi, numBytes          ; point esi at num bytes read for converting to string
-			mov ebx, 10                ; set our number base to base 10
-			lea edi, output1           ; point edit at location to store string
-			call Num2Str			   ; now convert number to a string
-			mov esi, edi               ; now point esi at that string to display
-			call PrintString           ; display the string
-			lea esi, bytesWriteStr     ; point esi at " bytes written." string
-			call PrintString           ; display it
-
-            popfd                      ; restore flags
-            popad                      ; restore registers
-            ret                        ; return to caller
-WriteFileContents   endp
 
 
 ;------------------------------------------------------------------------------
@@ -782,7 +656,7 @@ ReadFileContents  proc                 ; Define procedure
 			mov numBytes, eax			; now save value from eax into permanent variable
 			lea esi, read              ; point esi at num bytes read for converting to string
 			mov ebx, 10                ; set our number base to base 10
-			lea edi, output1           ; point edit at location to store string
+			lea edi, output1           ; point edi at location to store string
 			call Num2Str               ; now convert number to a string
 			mov esi, edi               ; now point esi at that string to display
 			call PrintString           ; display the string
@@ -865,7 +739,8 @@ GetString proc                         ; Define procedure
               near32 ptr read,         ;   variable for # bytes read
               0                        ;   overlapped mode
 			
-			mov ecx, read            
+			mov ecx, read
+			mov byte ptr [edi+ecx-1],0            
 			mov byte ptr [edi+ecx-2],0 ; replace CR/LF by trailing null
 
             popfd                      ; restore flags
@@ -1017,7 +892,7 @@ Str2Num proc
 
 			xor ax, ax					; zx = zero
 			xor cx, cx					; cx = zero			
-			mov bx, 10					; mov number base into bx
+			
 		
 		; for each character in string, perform weighted positional notation
 		; ax = (ax * base) + next number
@@ -1042,51 +917,4 @@ Str2Num proc
             popad                      ; restore registers
             ret                        ; return to caller
 Str2Num endp
-
-
-
-
-
-strlen  PROC
-		pushad                        ; save registers
-		pushfd                        ; save flags
-		
-
-
-push ebp                    ;establish stack frame
-mov ebp, esp
-push ebx                    ;save EBX
-sub eax, eax                ;length := 0
-mov ebx, [ebp+8]            ;address of string
-
-whileChar:
-cmp BYTE PTR [ebx], 0       ;null byte?
-je endWhileChar             ;exit if so
-inc eax                     ;increment length
-inc ebx                     ;point at next character
-jmp whileChar               ;repeat
-
-endWhileChar:
-
-pop ebx                     ;restore registers
-pop ebp
-            popfd                      ; restore flags
-            popad                      ; restore registers
-            ret                        ; return to caller
-
-strlen  ENDP
-
-
-
-
-
-
-
-
-
-
-
-
-
 end  ; end directive to compiler
-
